@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
-import { ChatService } from './chat.service';
-import { CreateLiveChatMessageDto } from './dto/create-live-chat-message.dto';
-import { UpdateLiveChatMessageDto } from './dto/update-live-chat-message.dto';
+import { CourseReviewsService } from './course-reviews.service';
+import { CreateCourseReviewDto } from './dto/create-course-review.dto';
+import { UpdateCourseReviewDto } from './dto/update-course-review.dto';
 
-@Controller('chat')
-export class ChatController {
-    constructor(private readonly service: ChatService) { }
+@Controller('course-reviews')
+export class CourseReviewsController {
+    constructor(private readonly service: CourseReviewsService) { }
 
     @Post()
-    create(@Body() dto: CreateLiveChatMessageDto) {
+    create(@Body() dto: CreateCourseReviewDto) {
         return this.service.create(dto);
     }
 
@@ -23,7 +23,7 @@ export class ChatController {
     }
 
     @Patch(':id')
-    update(@Param('id') id: string, @Body() dto: UpdateLiveChatMessageDto) {
+    update(@Param('id') id: string, @Body() dto: UpdateCourseReviewDto) {
         return this.service.update(id, dto);
     }
 
