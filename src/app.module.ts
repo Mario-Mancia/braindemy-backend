@@ -13,12 +13,19 @@ import { AdminModule } from './modules/admin/admin.module';
 import databaseConfig from './config/database.config';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
+import { TeachersModule } from './modules/teachers/teachers.module';
+import { StudentsModule } from './modules/students/students.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { TeacherSubscriptionsModule } from './modules/teacher-subscriptions/teacher-subscriptions.module';
+import { LiveSessionsModule } from './modules/live-sessions/live-sessions.module';
+import jwtConfig from './config/jwt.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig]
+      load: [databaseConfig, jwtConfig]
     }),
     AuthModule, 
     UsersModule, 
@@ -29,7 +36,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ChatModule, 
     NotificationsModule, 
     AdminModule, 
-    PrismaModule
+    PrismaModule, TeachersModule, StudentsModule, ReviewsModule, SubscriptionsModule, TeacherSubscriptionsModule, LiveSessionsModule
   ],
   controllers: [AppController],
   providers: [AppService],

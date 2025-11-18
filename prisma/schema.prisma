@@ -1,9 +1,257 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    url = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Creación de enumeradores para campos enum
+// Usuarios
+enum user_role {
+  admin
+  teacher
+  student
+}
+
+enum user_status {
+  active
+  banned
+  pending_verification
+}
+
+enum subscription_status {
+  active
+  expired
+  cancelled
+}
+
+enum payment_type {
+  course
+  subscription
+}
+
+enum payment_status {
+  pending
+  completed
+  failed
+}
+
+enum enrollment_status {
+  active
+  completed
+  cancelled
+}
+
+// Creación de modelos para gestionar cada una de las tablas.
+
+model users {
+  id            String      @id @default(uuid()) @db.Uuid
+  first_name    String
+  last_name     String
+  email         String      @unique
+  birthdate     DateTime?   @db.Date
+  password_hash String
+  role          user_role   @default(student)
+  timezone      String?
+  status        user_status @default(active)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @default(now())
+
+  // Relations
+  teacher       teachers?
+  student       students?
+  payments      payments[]
+  chatMessages  live_chat_messages[]
+  cards         cards[]
+  refreshTokens refresh_tokens[]
+}
+
+model teachers {
+  id                   String   @id @default(uuid()) @db.Uuid
+  user_id              String   @unique @db.Uuid
+  image_url            String?
+  bio                  String?
+  specialty            String?
+  rating               Decimal? @default(0) @db.Decimal(3, 2)
+  active_courses_count Int?     @default(0)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now())
+
+  // Relations
+  user          users                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  subscriptions teacher_subscriptions[]
+  courses       courses[]
+}
+
+model students {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String   @unique @db.Uuid
+  image_url      String?
+  bio            String?
+  academy        String?
+  academic_level String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  // Relations
+  user        users                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  enrollments course_enrollments[]
+  reviews     course_reviews[]
+}
+
+model subscriptions {
+  id                      String   @id @default(uuid()) @db.Uuid
+  name                    String
+  price                   Decimal  @db.Decimal(10, 2)
+  max_courses             Int?     @default(5)
+  max_students_per_course Int?     @default(50)
+  features                Json     @default("{}")
+  created_at              DateTime @default(now())
+  updated_at              DateTime @default(now())
+
+  // Relations
+  teacherSubscriptions teacher_subscriptions[]
+}
+
+model payments {
+  id         String         @id @default(uuid()) @db.Uuid
+  user_id    String?        @db.Uuid
+  amount     Decimal        @db.Decimal(10, 2)
+  type       payment_type
+  reference  String?
+  status     payment_status @default(pending)
+  created_at DateTime       @default(now())
+  updated_at DateTime       @default(now())
+
+  // Relations
+  user        users?                  @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  teacherSubs teacher_subscriptions[]
+  enrollments course_enrollments[]
+}
+
+model teacher_subscriptions {
+  id              String              @id @default(uuid()) @db.Uuid
+  teacher_id      String              @db.Uuid
+  subscription_id String              @db.Uuid
+  payment_id      String?             @db.Uuid
+  start_date      DateTime            @db.Date
+  end_date        DateTime?           @db.Date
+  status          subscription_status @default(active)
+
+  // Relations
+  teacher      teachers      @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  subscription subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+  payment      payments?     @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+}
+
+model courses {
+  id          String   @id @default(uuid()) @db.Uuid
+  teacher_id  String   @db.Uuid
+  title       String
+  description String?
+  price       Decimal? @default(0) @db.Decimal(10, 2)
+  schedule    Json     @default("{}")
+  category    String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  // Relations
+  teacher      teachers             @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  enrollments  course_enrollments[]
+  reviews      course_reviews[]
+  liveSessions live_sessions[]
+}
+
+model course_enrollments {
+  id          String            @id @default(uuid()) @db.Uuid
+  course_id   String            @db.Uuid
+  student_id  String            @db.Uuid
+  payment_id  String?           @db.Uuid
+  status      enrollment_status @default(active)
+  enrolled_at DateTime          @default(now())
+  updated_at  DateTime          @default(now())
+
+  // Relations
+  course  courses   @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  payment payments? @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+
+  @@unique([course_id, student_id])
+}
+
+model course_reviews {
+  id         String   @id @default(uuid()) @db.Uuid
+  course_id  String   @db.Uuid
+  student_id String   @db.Uuid
+  rating     Int
+  comment    String?
+  created_at DateTime @default(now())
+
+  // Relations
+  course  courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([course_id, student_id])
+}
+
+model live_sessions {
+  id          String    @id @default(uuid()) @db.Uuid
+  course_id   String    @db.Uuid
+  session_url String
+  start_time  DateTime
+  end_time    DateTime?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  // Relations
+  course   courses              @relation(fields: [course_id], references: [id])
+  messages live_chat_messages[]
+}
+
+model live_chat_messages {
+  id         String   @id @default(uuid()) @db.Uuid
+  session_id String   @db.Uuid
+  sender_id  String   @db.Uuid
+  message    String
+  sent_at    DateTime @default(now())
+  is_deleted Boolean  @default(false)
+
+  // Relations
+  session live_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  sender  users         @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+}
+
+model refresh_tokens {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  token      String   @unique
+  user_agent String?
+  ip_address String?
+  created_at DateTime @default(now())
+  expires_at DateTime
+
+  // Relations
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model cards {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  balance    Decimal  @default(0) @db.Decimal(10, 2)
+  label      String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  // Relations
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
 }

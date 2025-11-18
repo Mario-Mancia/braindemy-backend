@@ -4,6 +4,7 @@ import { StreamingService } from './streaming.service';
 
 @Module({
   controllers: [StreamingController],
-  providers: [StreamingService]
+  providers: [StreamingService],
+  exports: [StreamingService]
 })
 export class StreamingModule {}

@@ -61,6 +61,18 @@ CREATE TABLE students (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- TABLAS DE SESIONES
+
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    user_agent TEXT,
+    ip_address TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL
+);
+
 -- TABLAS DE SUSCRIPCIONES Y PAGOS
 
 CREATE TABLE subscriptions (
@@ -93,6 +105,16 @@ CREATE TABLE teacher_subscriptions (
     start_date DATE NOT NULL,
     end_date DATE,
     status subscription_status DEFAULT 'active'
+);
+
+CREATE TABLE cards (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    balance NUMERIC(10,2) NOT NULL DEFAULT 0,
+    label TEXT, -- nombre de la tarjeta.
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- TABLAS DE CURSOS
