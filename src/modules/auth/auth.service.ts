@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from '../auth/dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { RegisterUserDto } from '../users/dto/register-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -33,6 +34,55 @@ export class AuthService {
       refreshToken,
     };
   }
+
+  async registerPublic(dto: RegisterUserDto, req?: any) {
+  const exists = await this.usersService.findByEmail(dto.email);
+  if (exists) {
+    throw new ConflictException('Ya existe un usuario con este correo.');
+  }
+
+  const hashed = await bcrypt.hash(dto.password, 10);
+
+  // Asigna el role: si se envía 'teacher', se registra como tal; si no, student
+  const role = dto.role === 'teacher' ? 'teacher' : 'student';
+
+  const user = await this.prisma.users.create({
+    data: {
+      first_name: dto.first_name,
+      last_name: dto.last_name,
+      email: dto.email,
+      password_hash: hashed,
+      birthdate: dto.birthdate ? new Date(dto.birthdate) : undefined,
+      timezone: dto.timezone,
+      role,  // <-- aquí se asigna
+      status: 'active',
+    },
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      role: true,
+      status: true,
+      created_at: true,
+    },
+  });
+
+  const { accessToken, refreshToken } = this.generateTokens(
+    user.id,
+    user.email,
+    user.role,
+  );
+
+  await this.saveRefreshToken(user.id, refreshToken, req);
+
+  return {
+    message: 'Usuario registrado con éxito',
+    user,
+    accessToken,
+    refreshToken,
+  };
+}
 
   // -- SECCIÓN DE LOGIN
 
