@@ -1,5 +1,5 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsDateString, IsEnum} from 'class-validator'
-import { user_role, user_status } from '@prisma/client';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsDateString, IsEnum } from 'class-validator';
+import { $Enums } from '@prisma/client';
 
 export class CreateUserDto {
   @IsString()
@@ -8,11 +8,11 @@ export class CreateUserDto {
   @IsString()
   last_name: string;
 
-  @IsEmail({}, { message: 'El correo electrónico no es válido.' })
+  @IsEmail()
   email: string;
 
   @IsString()
-  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres.' })
+  @MinLength(8)
   password: string;
 
   @IsOptional()
@@ -24,10 +24,10 @@ export class CreateUserDto {
   timezone?: string;
 
   @IsOptional()
-  @IsEnum(user_role)
-  role?: user_role;
+  @IsEnum($Enums.user_role)
+  role?: $Enums.user_role;
 
   @IsOptional()
-  @IsEnum(user_status)
-  status?: user_status;
+  @IsEnum($Enums.user_status)
+  status?: $Enums.user_status;
 }

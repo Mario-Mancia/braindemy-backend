@@ -1,35 +1,35 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaClient, $Enums } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import * as bcrypt from 'bcrypt';
+import { GetUsersFiltersDto } from './dto/get-user-filter.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  private prisma = new PrismaClient();
 
+  /** FIND BY EMAIL */
+  async findByEmail(email: string) {
+    return this.prisma.users.findUnique({ where: { email } });
+  }
+
+  /** CREATE USER */
   async create(dto: CreateUserDto) {
-    const exists = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-    });
-
-    if (exists) {
-      throw new ConflictException('Ya existe un usuario con este email.');
-    }
-
-    const hashed = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     return this.prisma.users.create({
       data: {
         first_name: dto.first_name,
         last_name: dto.last_name,
         email: dto.email,
-        password_hash: hashed,
+        password_hash: hashedPassword,
         birthdate: dto.birthdate ? new Date(dto.birthdate) : undefined,
-        timezone: dto.timezone,
-        role: dto.role,
-        status: dto.status,
+        timezone: dto.timezone ?? undefined,
+        role: dto.role ?? undefined,
+        status: dto.status ?? undefined,
       },
+      // No devolvemos password_hash
       select: {
         id: true,
         first_name: true,
@@ -37,29 +37,39 @@ export class UsersService {
         email: true,
         role: true,
         status: true,
+        birthdate: true,
+        timezone: true,
         created_at: true,
+        updated_at: true,
       },
     });
   }
 
-  async findByEmail(email: string) {
-    return this.prisma.users.findUnique({
-      where: { email },
-    });
-  }
+  /** FIND ALL */
+  async findAll(filters: GetUsersFiltersDto) {
+    const page = filters.page ? Number(filters.page) : 1;
+    const limit = filters.limit ? Number(filters.limit) : 10;
+    const skip = (page - 1) * limit;
 
-  async findOne(id: string) {
-    const user = await this.prisma.users.findUnique({
-      where: { id },
-    });
+    const where: any = {};
 
-    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (filters.role) where.role = filters.role as $Enums.user_role;
+    if (filters.status) where.status = filters.status as $Enums.user_status;
 
-    return user;
-  }
+    if (filters.search) {
+      where.OR = [
+        { first_name: { contains: filters.search, mode: 'insensitive' } },
+        { last_name: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
 
-  async findAll() {
-    return this.prisma.users.findMany({
+    const total = await this.prisma.users.count({ where });
+
+    const users = await this.prisma.users.findMany({
+      where,
+      skip,
+      take: limit,
       orderBy: { created_at: 'desc' },
       select: {
         id: true,
@@ -68,37 +78,208 @@ export class UsersService {
         email: true,
         role: true,
         status: true,
+        birthdate: true,
+        timezone: true,
         created_at: true,
-      },
+      }
     });
+
+    return {
+      data: users,
+      total,
+      page,
+      limit,
+      hasMore: skip + users.length < total
+    };
   }
 
+  /** FIND ONE – ahora sin password */
+  async findOne(id: string) {
+    const user = await this.prisma.users.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        role: true,
+        status: true,
+        birthdate: true,
+        timezone: true,
+        created_at: true,
+        updated_at: true,
+      }
+    });
+
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    return user;
+  }
+
+  /** UPDATE */
   async update(id: string, dto: UpdateUserDto) {
-    const existing = await this.prisma.users.findUnique({ where: { id } });
+  const existing = await this.prisma.users.findUnique({ where: { id } });
 
-    if (!existing) throw new NotFoundException('Usuario no encontrado');
+  if (!existing) {
+    throw new NotFoundException('Usuario no encontrado');
+  }
 
-    let password_hash;
+  // Mantener contraseña anterior si no viene un reset
+  let password_hash = existing.password_hash;
 
-    if (dto.password) {
-      password_hash = await bcrypt.hash(dto.password, 10);
+  // Si el admin envía una nueva contraseña → hashearla
+  if (dto.new_password) {
+    password_hash = await bcrypt.hash(dto.new_password, 10);
+  }
+
+  // Conversión segura de fecha
+  let formattedBirthdate = existing.birthdate; // por defecto conservar
+  
+  if (dto.birthdate) {
+    // Convertir YYYY-MM-DD → Date
+    const converted = new Date(dto.birthdate);
+
+    if (isNaN(converted.getTime())) {
+      // Si el frontend envió algo inválido
+      throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
     }
 
-    return this.prisma.users.update({
-      where: { id },
-      data: {
-        first_name: dto.first_name,
-        last_name: dto.last_name,
-        birthdate: dto.birthdate ? new Date(dto.birthdate) : undefined,
-        timezone: dto.timezone,
-        ...(password_hash && { password_hash }),
-      },
-    });
+    formattedBirthdate = converted;
   }
 
+  const updated = await this.prisma.users.update({
+    where: { id },
+    data: {
+      first_name: dto.first_name ?? existing.first_name,
+      last_name: dto.last_name ?? existing.last_name,
+      timezone: dto.timezone ?? existing.timezone,
+      role: dto.role ?? existing.role,
+      status: dto.status ?? existing.status,
+      password_hash,
+      birthdate: formattedBirthdate,
+    },
+    select: {
+      id: true,
+      first_name: true,
+      last_name: true,
+      email: true,
+      role: true,
+      status: true,
+      birthdate: true,
+      timezone: true,
+      created_at: true,
+      updated_at: true,
+    }
+  });
+
+  return updated;
+}
+
+  /** DELETE */
   async remove(id: string) {
-    return this.prisma.users.delete({
-      where: { id },
-    });
+    await this.findOne(id);
+    return this.prisma.users.delete({ where: { id } });
   }
+
+
+  /** ======= GLOBAL STATS ======= */
+async getGlobalStats() {
+  const [totalUsers, totalTeachers, totalStudents, activeUsers] =
+    await Promise.all([
+      this.prisma.users.count(),
+      this.prisma.users.count({
+        where: { role: $Enums.user_role.teacher },
+      }),
+      this.prisma.users.count({
+        where: { role: $Enums.user_role.student },
+      }),
+      this.prisma.users.count({
+        where: { status: $Enums.user_status.active },
+      }),
+    ]);
+
+  return {
+    totalUsers,
+    totalTeachers,
+    totalStudents,
+    activeUsers,
+  };
+}
+
+/** ======= ROLES STATS ======= */
+async getRoleStats() {
+  const [teachers, students, admins] = await Promise.all([
+    this.prisma.users.count({
+      where: { role: $Enums.user_role.teacher },
+    }),
+    this.prisma.users.count({
+      where: { role: $Enums.user_role.student },
+    }),
+    this.prisma.users.count({
+      where: { role: $Enums.user_role.admin },
+    }),
+  ]);
+
+  return {
+    teachers,
+    students,
+    admins,
+  };
+}
+
+/** ======= STATUS STATS ======= */
+async getStatusStats() {
+  const [active, banned, pending] = await Promise.all([
+    this.prisma.users.count({
+      where: { status: $Enums.user_status.active },
+    }),
+    this.prisma.users.count({
+      where: { status: $Enums.user_status.banned },
+    }),
+    this.prisma.users.count({
+      where: { status: $Enums.user_status.pending_verification },
+    }),
+  ]);
+
+  return {
+    active,
+    banned,
+    pending_verification: pending,
+  };
+}
+
+/** ======= COUNT TEACHERS ======= */
+async getTeachersCount() {
+  const result = await this.prisma.users.count({
+    where: { role: $Enums.user_role.teacher },
+  });
+
+  console.log("Teachers count desde backend:", result);
+  return result;
+}
+
+/** ======= COUNT STUDENTS ======= */
+async getStudentsCount() {
+  const result = await this.prisma.users.count({
+    where: { role: $Enums.user_role.student },
+  });
+
+  console.log("Students count desde backend:", result);
+  return result;
+}
+
+/** ======= ALL STATS (COMBINADO) ======= */
+async getAllStats() {
+  const [global, roles, status] = await Promise.all([
+    this.getGlobalStats(),
+    this.getRoleStats(),
+    this.getStatusStats(),
+  ]);
+
+  return {
+    global,
+    roles,
+    status,
+  };
+}
 }

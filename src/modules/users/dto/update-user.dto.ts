@@ -1,7 +1,8 @@
-import { IsOptional, IsString, MinLength, IsDateString } from 'class-validator';
+import { IsOptional, IsString, MinLength, IsDateString, IsEnum } from 'class-validator';
+import { $Enums } from '@prisma/client';
 
 export class UpdateUserDto {
-    @IsOptional()
+  @IsOptional()
   @IsString()
   first_name?: string;
 
@@ -17,8 +18,17 @@ export class UpdateUserDto {
   @IsString()
   timezone?: string;
 
+  // ⚠️ Cambio importante → new_password en lugar de password
   @IsOptional()
   @IsString()
   @MinLength(8)
-  password?: string;
+  new_password?: string;
+
+  @IsOptional()
+  @IsEnum($Enums.user_role)
+  role?: $Enums.user_role;
+
+  @IsOptional()
+  @IsEnum($Enums.user_status)
+  status?: $Enums.user_status;
 }
