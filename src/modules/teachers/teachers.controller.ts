@@ -1,13 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Query } from '@nestjs/common';
 import { TeachersService } from './teachers.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { TeacherFilterDto } from './dto/teacher-filter.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('teachers')
+@Roles('admin', 'teacher')
 @Controller('teachers')
 export class TeachersController {
     constructor(private readonly teachersService: TeachersService) { }
@@ -18,8 +19,8 @@ export class TeachersController {
     }
 
     @Get()
-    findAll() {
-        return this.teachersService.findAll();
+    findAll(@Query() filters: TeacherFilterDto) {
+        return this.teachersService.findAll(filters);
     }
 
     @Get(':id')

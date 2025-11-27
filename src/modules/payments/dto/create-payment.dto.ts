@@ -15,8 +15,4 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   reference?: string;
-
-  @IsOptional()
-  @IsEnum(payment_status)
-  status?: payment_status;
 }

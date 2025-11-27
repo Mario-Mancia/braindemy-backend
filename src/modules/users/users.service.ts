@@ -118,62 +118,62 @@ export class UsersService {
 
   /** UPDATE */
   async update(id: string, dto: UpdateUserDto) {
-  const existing = await this.prisma.users.findUnique({ where: { id } });
+    const existing = await this.prisma.users.findUnique({ where: { id } });
 
-  if (!existing) {
-    throw new NotFoundException('Usuario no encontrado');
-  }
-
-  // Mantener contraseña anterior si no viene un reset
-  let password_hash = existing.password_hash;
-
-  // Si el admin envía una nueva contraseña → hashearla
-  if (dto.new_password) {
-    password_hash = await bcrypt.hash(dto.new_password, 10);
-  }
-
-  // Conversión segura de fecha
-  let formattedBirthdate = existing.birthdate; // por defecto conservar
-  
-  if (dto.birthdate) {
-    // Convertir YYYY-MM-DD → Date
-    const converted = new Date(dto.birthdate);
-
-    if (isNaN(converted.getTime())) {
-      // Si el frontend envió algo inválido
-      throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
+    if (!existing) {
+      throw new NotFoundException('Usuario no encontrado');
     }
 
-    formattedBirthdate = converted;
-  }
+    // Mantener contraseña anterior si no viene un reset
+    let password_hash = existing.password_hash;
 
-  const updated = await this.prisma.users.update({
-    where: { id },
-    data: {
-      first_name: dto.first_name ?? existing.first_name,
-      last_name: dto.last_name ?? existing.last_name,
-      timezone: dto.timezone ?? existing.timezone,
-      role: dto.role ?? existing.role,
-      status: dto.status ?? existing.status,
-      password_hash,
-      birthdate: formattedBirthdate,
-    },
-    select: {
-      id: true,
-      first_name: true,
-      last_name: true,
-      email: true,
-      role: true,
-      status: true,
-      birthdate: true,
-      timezone: true,
-      created_at: true,
-      updated_at: true,
+    // Si el admin envía una nueva contraseña → hashearla
+    if (dto.new_password) {
+      password_hash = await bcrypt.hash(dto.new_password, 10);
     }
-  });
 
-  return updated;
-}
+    // Conversión segura de fecha
+    let formattedBirthdate = existing.birthdate; // por defecto conservar
+
+    if (dto.birthdate) {
+      // Convertir YYYY-MM-DD → Date
+      const converted = new Date(dto.birthdate);
+
+      if (isNaN(converted.getTime())) {
+        // Si el frontend envió algo inválido
+        throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
+      }
+
+      formattedBirthdate = converted;
+    }
+
+    const updated = await this.prisma.users.update({
+      where: { id },
+      data: {
+        first_name: dto.first_name ?? existing.first_name,
+        last_name: dto.last_name ?? existing.last_name,
+        timezone: dto.timezone ?? existing.timezone,
+        role: dto.role ?? existing.role,
+        status: dto.status ?? existing.status,
+        password_hash,
+        birthdate: formattedBirthdate,
+      },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        role: true,
+        status: true,
+        birthdate: true,
+        timezone: true,
+        created_at: true,
+        updated_at: true,
+      }
+    });
+
+    return updated;
+  }
 
   /** DELETE */
   async remove(id: string) {
@@ -183,10 +183,32 @@ export class UsersService {
 
 
   /** ======= GLOBAL STATS ======= */
-async getGlobalStats() {
-  const [totalUsers, totalTeachers, totalStudents, activeUsers] =
-    await Promise.all([
-      this.prisma.users.count(),
+  async getGlobalStats() {
+    const [totalUsers, totalTeachers, totalStudents, activeUsers] =
+      await Promise.all([
+        this.prisma.users.count(),
+        this.prisma.users.count({
+          where: { role: $Enums.user_role.teacher },
+        }),
+        this.prisma.users.count({
+          where: { role: $Enums.user_role.student },
+        }),
+        this.prisma.users.count({
+          where: { status: $Enums.user_status.active },
+        }),
+      ]);
+
+    return {
+      totalUsers,
+      totalTeachers,
+      totalStudents,
+      activeUsers,
+    };
+  }
+
+  /** ======= ROLES STATS ======= */
+  async getRoleStats() {
+    const [teachers, students, admins] = await Promise.all([
       this.prisma.users.count({
         where: { role: $Enums.user_role.teacher },
       }),
@@ -194,92 +216,68 @@ async getGlobalStats() {
         where: { role: $Enums.user_role.student },
       }),
       this.prisma.users.count({
-        where: { status: $Enums.user_status.active },
+        where: { role: $Enums.user_role.admin },
       }),
     ]);
 
-  return {
-    totalUsers,
-    totalTeachers,
-    totalStudents,
-    activeUsers,
-  };
-}
+    return {
+      teachers,
+      students,
+      admins,
+    };
+  }
 
-/** ======= ROLES STATS ======= */
-async getRoleStats() {
-  const [teachers, students, admins] = await Promise.all([
-    this.prisma.users.count({
+  /** ======= STATUS STATS ======= */
+  async getStatusStats() {
+    const [active, banned, pending] = await Promise.all([
+      this.prisma.users.count({
+        where: { status: $Enums.user_status.active },
+      }),
+      this.prisma.users.count({
+        where: { status: $Enums.user_status.banned },
+      }),
+      this.prisma.users.count({
+        where: { status: $Enums.user_status.pending_verification },
+      }),
+    ]);
+
+    return {
+      active,
+      banned,
+      pending_verification: pending,
+    };
+  }
+
+  /** ======= COUNT TEACHERS ======= */
+  async getTeachersCount() {
+    const result = await this.prisma.users.count({
       where: { role: $Enums.user_role.teacher },
-    }),
-    this.prisma.users.count({
+    });
+    return result;
+  }
+
+  /** ======= COUNT STUDENTS ======= */
+  async getStudentsCount() {
+    const result = await this.prisma.users.count({
       where: { role: $Enums.user_role.student },
-    }),
-    this.prisma.users.count({
-      where: { role: $Enums.user_role.admin },
-    }),
-  ]);
+    });
 
-  return {
-    teachers,
-    students,
-    admins,
-  };
-}
+    console.log("Students count desde backend:", result);
+    return result;
+  }
 
-/** ======= STATUS STATS ======= */
-async getStatusStats() {
-  const [active, banned, pending] = await Promise.all([
-    this.prisma.users.count({
-      where: { status: $Enums.user_status.active },
-    }),
-    this.prisma.users.count({
-      where: { status: $Enums.user_status.banned },
-    }),
-    this.prisma.users.count({
-      where: { status: $Enums.user_status.pending_verification },
-    }),
-  ]);
+  /** ======= ALL STATS (COMBINADO) ======= */
+  async getAllStats() {
+    const [global, roles, status] = await Promise.all([
+      this.getGlobalStats(),
+      this.getRoleStats(),
+      this.getStatusStats(),
+    ]);
 
-  return {
-    active,
-    banned,
-    pending_verification: pending,
-  };
-}
-
-/** ======= COUNT TEACHERS ======= */
-async getTeachersCount() {
-  const result = await this.prisma.users.count({
-    where: { role: $Enums.user_role.teacher },
-  });
-
-  console.log("Teachers count desde backend:", result);
-  return result;
-}
-
-/** ======= COUNT STUDENTS ======= */
-async getStudentsCount() {
-  const result = await this.prisma.users.count({
-    where: { role: $Enums.user_role.student },
-  });
-
-  console.log("Students count desde backend:", result);
-  return result;
-}
-
-/** ======= ALL STATS (COMBINADO) ======= */
-async getAllStats() {
-  const [global, roles, status] = await Promise.all([
-    this.getGlobalStats(),
-    this.getRoleStats(),
-    this.getStatusStats(),
-  ]);
-
-  return {
-    global,
-    roles,
-    status,
-  };
-}
+    return {
+      global,
+      roles,
+      status,
+    };
+  }
 }

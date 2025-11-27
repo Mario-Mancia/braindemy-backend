@@ -1,4 +1,7 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreatePaymentDto } from './create-payment.dto';
+import { IsEnum } from 'class-validator';
+import { payment_status } from '@prisma/client';
 
-export class UpdatePaymentDto extends PartialType(CreatePaymentDto) {}
+export class UpdatePaymentStatusDto {
+  @IsEnum(payment_status)
+  status: payment_status;
+}

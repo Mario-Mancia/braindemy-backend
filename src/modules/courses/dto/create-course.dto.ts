@@ -1,4 +1,4 @@
-import { IsUUID, IsString, IsOptional, IsNumber, IsBoolean } from 'class-validator';
+import { IsUUID, IsString, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
 
 export class CreateCourseDto {
   @IsUUID()
@@ -13,6 +13,7 @@ export class CreateCourseDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   price?: number;
 
   @IsOptional()

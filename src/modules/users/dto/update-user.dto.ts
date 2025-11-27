@@ -18,7 +18,6 @@ export class UpdateUserDto {
   @IsString()
   timezone?: string;
 
-  // ⚠️ Cambio importante → new_password en lugar de password
   @IsOptional()
   @IsString()
   @MinLength(8)

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, IsNumber, IsPositive, Max, Min } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateTeacherDto {
   @IsUUID()
