@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient, $Enums } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { GetUsersFiltersDto } from './dto/get-user-filter.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -25,9 +26,7 @@ export class UsersService {
         email: dto.email,
         password_hash: hashedPassword,
         birthdate: dto.birthdate ? new Date(dto.birthdate) : undefined,
-        timezone: dto.timezone ?? undefined,
-        role: dto.role ?? undefined,
-        status: dto.status ?? undefined,
+        timezone: dto.timezone ?? undefined
       },
       // No devolvemos password_hash
       select: {
@@ -47,8 +46,8 @@ export class UsersService {
 
   /** FIND ALL */
   async findAll(filters: GetUsersFiltersDto) {
-    const page = filters.page ? Number(filters.page) : 1;
-    const limit = filters.limit ? Number(filters.limit) : 10;
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -117,46 +116,35 @@ export class UsersService {
   }
 
   /** UPDATE */
-  async update(id: string, dto: UpdateUserDto) {
+  async updateUser(id: string, dto: UpdateUserDto, requester: any) {
     const existing = await this.prisma.users.findUnique({ where: { id } });
 
-    if (!existing) {
-      throw new NotFoundException('Usuario no encontrado');
+    if (!existing) throw new NotFoundException('Usuario no encontrado');
+
+    if (requester.id !== id && requester.role !== 'admin') {
+      throw new ForbiddenException('No puedes editar a otros usuarios.');
     }
 
-    // Mantener contraseña anterior si no viene un reset
     let password_hash = existing.password_hash;
-
-    // Si el admin envía una nueva contraseña → hashearla
     if (dto.new_password) {
       password_hash = await bcrypt.hash(dto.new_password, 10);
     }
 
-    // Conversión segura de fecha
-    let formattedBirthdate = existing.birthdate; // por defecto conservar
-
+    let birthdate = existing.birthdate;
     if (dto.birthdate) {
-      // Convertir YYYY-MM-DD → Date
-      const converted = new Date(dto.birthdate);
-
-      if (isNaN(converted.getTime())) {
-        // Si el frontend envió algo inválido
-        throw new BadRequestException('Formato de fecha inválido. Use YYYY-MM-DD');
-      }
-
-      formattedBirthdate = converted;
+      const d = new Date(dto.birthdate);
+      if (isNaN(d.getTime())) throw new BadRequestException('Fecha inválida');
+      birthdate = d;
     }
 
-    const updated = await this.prisma.users.update({
+    return this.prisma.users.update({
       where: { id },
       data: {
         first_name: dto.first_name ?? existing.first_name,
         last_name: dto.last_name ?? existing.last_name,
         timezone: dto.timezone ?? existing.timezone,
-        role: dto.role ?? existing.role,
-        status: dto.status ?? existing.status,
+        birthdate,
         password_hash,
-        birthdate: formattedBirthdate,
       },
       select: {
         id: true,
@@ -167,14 +155,31 @@ export class UsersService {
         status: true,
         birthdate: true,
         timezone: true,
-        created_at: true,
-        updated_at: true,
       }
     });
-
-    return updated;
   }
 
+  async updateUserAdmin(id: string, dto: AdminUpdateUserDto) {
+    const existing = await this.prisma.users.findUnique({ where: { id } });
+
+    if (!existing) throw new NotFoundException('Usuario no encontrado');
+
+    return this.prisma.users.update({
+      where: { id },
+      data: {
+        role: dto.role ?? existing.role,
+        status: dto.status ?? existing.status,
+      },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+        status: true,
+        email: true
+      }
+    });
+  }
   /** DELETE */
   async remove(id: string) {
     await this.findOne(id);

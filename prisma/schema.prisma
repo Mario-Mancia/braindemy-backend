@@ -1,3 +1,7 @@
+// ===============================================
+// DATASOURCE & GENERATORS
+// ===============================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,8 +12,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// Creación de enumeradores para campos enum
-// Usuarios
+// ===============================================
+// ENUMS (1:1 con PostgreSQL)
+// ===============================================
+
 enum user_role {
   admin
   teacher
@@ -20,6 +26,12 @@ enum user_status {
   active
   banned
   pending_verification
+}
+
+enum teacher_application_status {
+  pending
+  approved
+  rejected
 }
 
 enum subscription_status {
@@ -45,7 +57,16 @@ enum enrollment_status {
   cancelled
 }
 
-// Creación de modelos para gestionar cada una de las tablas.
+enum notification_type {
+  system
+  course
+  payment
+  personal
+}
+
+// ===============================================
+// MODELS — TABLAS DE USUARIOS
+// ===============================================
 
 model users {
   id            String      @id @default(uuid()) @db.Uuid
@@ -60,32 +81,55 @@ model users {
   created_at    DateTime    @default(now())
   updated_at    DateTime    @default(now())
 
-  // Relations
-  teacher       teachers?
-  student       students?
-  payments      payments[]
-  chatMessages  live_chat_messages[]
-  cards         cards[]
-  refreshTokens refresh_tokens[]
+  teacher              teachers?
+  student              students?
+  refreshTokens        refresh_tokens[]
+  payments             payments[]
+  cards                cards[]
+  notifications        notifications[]
+  chatMessages         live_chat_messages[]
+  teachersApplications teachers_applications[]
 }
 
+// TEACHERS
 model teachers {
   id                   String   @id @default(uuid()) @db.Uuid
   user_id              String   @unique @db.Uuid
   image_url            String?
   bio                  String?
   specialty            String?
+  experience           String?
+  portfolio_url        String?
   rating               Decimal? @default(0) @db.Decimal(3, 2)
-  active_courses_count Int?     @default(0)
+  active_courses_count Int      @default(0)
   created_at           DateTime @default(now())
   updated_at           DateTime @default(now())
 
-  // Relations
   user          users                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  applications  teachers_applications[]
   subscriptions teacher_subscriptions[]
   courses       courses[]
 }
 
+// TEACHER APPLICATIONS
+model teachers_applications {
+  id            String                     @id @default(uuid()) @db.Uuid
+  user_id       String                     @db.Uuid
+  bio           String?
+  specialty     String?
+  experience    String?
+  portfolio_url String?
+  status        teacher_application_status @default(pending)
+  admin_comment String?
+  created_at    DateTime                   @default(now())
+  updated_at    DateTime                   @default(now())
+
+  user       users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  teachers   teachers? @relation(fields: [teachersId], references: [id])
+  teachersId String?   @db.Uuid
+}
+
+// STUDENTS
 model students {
   id             String   @id @default(uuid()) @db.Uuid
   user_id        String   @unique @db.Uuid
@@ -96,24 +140,44 @@ model students {
   created_at     DateTime @default(now())
   updated_at     DateTime @default(now())
 
-  // Relations
   user        users                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   enrollments course_enrollments[]
   reviews     course_reviews[]
+  comments    class_comments[]
+  progress    lesson_progress[]
 }
+
+// ===============================================
+// SESIONES / AUTENTICACIÓN
+// ===============================================
+
+model refresh_tokens {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  token      String   @unique
+  user_agent String?
+  ip_address String?
+  created_at DateTime @default(now())
+  expires_at DateTime
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// ===============================================
+// SUSCRIPCIONES Y PAGOS
+// ===============================================
 
 model subscriptions {
   id                      String   @id @default(uuid()) @db.Uuid
   name                    String
   price                   Decimal  @db.Decimal(10, 2)
-  max_courses             Int?     @default(5)
-  max_students_per_course Int?     @default(50)
+  max_courses             Int      @default(1)
+  max_students_per_course Int      @default(50)
   features                Json     @default("{}")
   created_at              DateTime @default(now())
   updated_at              DateTime @default(now())
 
-  // Relations
-  teacherSubscriptions teacher_subscriptions[]
+  teacherSubs teacher_subscriptions[]
 }
 
 model payments {
@@ -126,7 +190,6 @@ model payments {
   created_at DateTime       @default(now())
   updated_at DateTime       @default(now())
 
-  // Relations
   user        users?                  @relation(fields: [user_id], references: [id], onDelete: SetNull)
   teacherSubs teacher_subscriptions[]
   enrollments course_enrollments[]
@@ -141,104 +204,9 @@ model teacher_subscriptions {
   end_date        DateTime?           @db.Date
   status          subscription_status @default(active)
 
-  // Relations
   teacher      teachers      @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
   subscription subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
   payment      payments?     @relation(fields: [payment_id], references: [id], onDelete: SetNull)
-}
-
-model courses {
-  id          String   @id @default(uuid()) @db.Uuid
-  teacher_id  String   @db.Uuid
-  title       String
-  description String?
-  price       Decimal? @default(0) @db.Decimal(10, 2)
-  schedule    Json     @default("{}")
-  category    String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now())
-
-  // Relations
-  teacher      teachers             @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
-  enrollments  course_enrollments[]
-  reviews      course_reviews[]
-  liveSessions live_sessions[]
-}
-
-model course_enrollments {
-  id          String            @id @default(uuid()) @db.Uuid
-  course_id   String            @db.Uuid
-  student_id  String            @db.Uuid
-  payment_id  String?           @db.Uuid
-  status      enrollment_status @default(active)
-  enrolled_at DateTime          @default(now())
-  updated_at  DateTime          @default(now())
-
-  // Relations
-  course  courses   @relation(fields: [course_id], references: [id], onDelete: Cascade)
-  student students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
-  payment payments? @relation(fields: [payment_id], references: [id], onDelete: SetNull)
-
-  @@unique([course_id, student_id])
-}
-
-model course_reviews {
-  id         String   @id @default(uuid()) @db.Uuid
-  course_id  String   @db.Uuid
-  student_id String   @db.Uuid
-  rating     Int
-  comment    String?
-  created_at DateTime @default(now())
-
-  // Relations
-  course  courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
-  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
-
-  @@unique([course_id, student_id])
-}
-
-model live_sessions {
-  id          String    @id @default(uuid()) @db.Uuid
-  course_id   String    @db.Uuid
-  session_url String
-  start_time  DateTime
-  end_time    DateTime?
-  is_active   Boolean   @default(true)
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @default(now())
-
-  // Relations
-  course   courses              @relation(fields: [course_id], references: [id])
-  messages live_chat_messages[]
-}
-
-model live_chat_messages {
-  id         String   @id @default(uuid()) @db.Uuid
-  session_id String   @db.Uuid
-  sender_id  String   @db.Uuid
-  message    String
-  sent_at    DateTime @default(now())
-  is_deleted Boolean  @default(false)
-
-  // Relations
-  session live_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
-  sender  users         @relation(fields: [sender_id], references: [id], onDelete: Cascade)
-}
-
-model refresh_tokens {
-  id         String   @id @default(uuid()) @db.Uuid
-  user_id    String   @db.Uuid
-  token      String   @unique
-  user_agent String?
-  ip_address String?
-  created_at DateTime @default(now())
-  expires_at DateTime
-
-  // Relations
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
 }
 
 model cards {
@@ -250,8 +218,162 @@ model cards {
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 
-  // Relations
   user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
+}
+
+// ===============================================
+// CURSOS
+// ===============================================
+
+model courses {
+  id           String   @id @default(uuid()) @db.Uuid
+  teacher_id   String   @db.Uuid
+  title        String
+  description  String?
+  category     String?
+  price        Decimal? @default(0) @db.Decimal(10, 2)
+  color        String?
+  cover_url    String?
+  level        String?
+  duration     String?
+  max_students Int      @default(50)
+  schedule     Json     @default("{}")
+  settings     Json     @default("{}")
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  teacher      teachers             @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  enrollments  course_enrollments[]
+  reviews      course_reviews[]
+  comments     class_comments[]
+  lessons      lessons[]
+  liveSessions live_sessions[]
+}
+
+// ENROLLMENTS
+model course_enrollments {
+  id          String            @id @default(uuid()) @db.Uuid
+  course_id   String            @db.Uuid
+  student_id  String            @db.Uuid
+  payment_id  String?           @db.Uuid
+  status      enrollment_status @default(active)
+  enrolled_at DateTime          @default(now())
+  updated_at  DateTime          @default(now())
+
+  course  courses   @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  payment payments? @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+
+  @@unique([course_id, student_id])
+}
+
+// REVIEWS
+model course_reviews {
+  id         String   @id @default(uuid()) @db.Uuid
+  course_id  String   @db.Uuid
+  student_id String   @db.Uuid
+  rating     Int
+  comment    String?
+  created_at DateTime @default(now())
+
+  course  courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([course_id, student_id])
+}
+
+// COMMENTS
+model class_comments {
+  id         String   @id @default(uuid()) @db.Uuid
+  course_id  String   @db.Uuid
+  student_id String   @db.Uuid
+  comment    String
+  created_at DateTime @default(now())
+
+  course  courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+}
+
+// ===============================================
+// LESSONS
+// ===============================================
+
+model lessons {
+  id         String   @id @default(uuid()) @db.Uuid
+  course_id  String   @db.Uuid
+  title      String
+  content    String?
+  video_url  String?
+  file_url   String?
+  position   Int
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  course   courses           @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  progress lesson_progress[]
+
+  @@unique([course_id, position])
+}
+
+model lesson_progress {
+  id           String    @id @default(uuid()) @db.Uuid
+  lesson_id    String    @db.Uuid
+  student_id   String    @db.Uuid
+  is_completed Boolean   @default(false)
+  completed_at DateTime?
+
+  lesson  lessons  @relation(fields: [lesson_id], references: [id], onDelete: Cascade)
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([lesson_id, student_id])
+}
+
+// ===============================================
+// NOTIFICATIONS
+// ===============================================
+
+model notifications {
+  id         String            @id @default(uuid()) @db.Uuid
+  user_id    String            @db.Uuid
+  title      String
+  message    String
+  type       notification_type @default(system)
+  is_read    Boolean           @default(false)
+  created_at DateTime          @default(now())
+  updated_at DateTime          @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// ===============================================
+// LIVE SESSIONS
+// ===============================================
+
+model live_sessions {
+  id          String    @id @default(uuid()) @db.Uuid
+  course_id   String    @db.Uuid
+  session_url String
+  start_time  DateTime
+  end_time    DateTime?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  course   courses              @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  messages live_chat_messages[]
+}
+
+model live_chat_messages {
+  id         String   @id @default(uuid()) @db.Uuid
+  session_id String   @db.Uuid
+  sender_id  String   @db.Uuid
+  message    String
+  sent_at    DateTime @default(now())
+  is_deleted Boolean  @default(false)
+
+  session live_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  sender  users         @relation(fields: [sender_id], references: [id], onDelete: Cascade)
 }

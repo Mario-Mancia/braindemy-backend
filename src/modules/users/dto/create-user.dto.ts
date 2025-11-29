@@ -22,12 +22,4 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   timezone?: string;
-
-  @IsOptional()
-  @IsEnum($Enums.user_role)
-  role?: $Enums.user_role;
-
-  @IsOptional()
-  @IsEnum($Enums.user_status)
-  status?: $Enums.user_status;
 }

@@ -18,12 +18,17 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Definición decada uno de los enums, se realiza acá para un mejor mantenimiento, orden y limpieza del script.
 CREATE TYPE user_role AS ENUM ('admin', 'teacher', 'student');
 CREATE TYPE user_status AS ENUM ('active', 'banned', 'pending_verification');
+CREATE TYPE teacher_application_status AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE subscription_status AS ENUM ('active', 'expired', 'cancelled');
 CREATE TYPE payment_type AS ENUM ('course', 'subscription');
 CREATE TYPE payment_status AS ENUM ('pending', 'completed', 'failed');
 CREATE TYPE enrollment_status AS ENUM ('active', 'completed', 'cancelled');
+CREATE TYPE notification_type AS ENUM ('system', 'course', 'payment', 'personal');
 
+-- =====================================================
 -- TABLAS DE USUARIOS
+-- =====================================================
+
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     first_name TEXT NOT NULL,
@@ -44,8 +49,23 @@ CREATE TABLE teachers (
     image_url TEXT,
     bio TEXT,
     specialty TEXT,
+    experience TEXT,
+    portfolio_url TEXT,
     rating NUMERIC(3,2) DEFAULT 0,
     active_courses_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE teachers_applications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    bio TEXT,
+    specialty TEXT,
+    experience TEXT,
+    portfolio_url TEXT,
+    status teacher_application_status DEFAULT 'pending',
+    admin_comment TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -61,25 +81,29 @@ CREATE TABLE students (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- =====================================================
 -- TABLAS DE SESIONES
+-- =====================================================
 
 CREATE TABLE refresh_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    token TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
     user_agent TEXT,
     ip_address TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
     expires_at TIMESTAMP NOT NULL
 );
 
+-- =====================================================
 -- TABLAS DE SUSCRIPCIONES Y PAGOS
+-- =====================================================
 
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     price NUMERIC(10,2) NOT NULL,
-    max_courses INT DEFAULT 5,
+    max_courses INT DEFAULT 1,
     max_students_per_course INT DEFAULT 50,
     features JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -111,22 +135,32 @@ CREATE TABLE cards (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     balance NUMERIC(10,2) NOT NULL DEFAULT 0,
-    label TEXT, -- nombre de la tarjeta.
+    label TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- =====================================================
 -- TABLAS DE CURSOS
+-- =====================================================
 
 CREATE TABLE courses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     teacher_id UUID REFERENCES teachers(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
-    price NUMERIC(10,2) DEFAULT 0,
-    schedule JSONB DEFAULT '{}'::jsonb,
     category TEXT,
+    price NUMERIC(10,2) DEFAULT 0,
+    color TEXT,
+    cover_url TEXT,
+
+    level TEXT CHECK (level IN ('beginner','intermediate','advanced')),
+    duration TEXT,
+
+    max_students INT DEFAULT 50,
+    schedule JSONB DEFAULT '{}'::jsonb,
+    settings JSONB DEFAULT '{}'::jsonb,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -153,7 +187,50 @@ CREATE TABLE course_reviews (
     UNIQUE(course_id, student_id)
 );
 
--- TABLAS DE SESIONES EN VIVO
+CREATE TABLE class_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE lessons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT,
+    video_url TEXT,
+    file_url TEXT,
+    position INT NOT NULL CHECK (position >= 1),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (course_id, position)
+);
+
+CREATE TABLE lesson_progress (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    lesson_id UUID REFERENCES lessons(id) ON DELETE CASCADE,
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    is_completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP,
+    UNIQUE (lesson_id, student_id)
+);
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type notification_type DEFAULT 'system',
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================================================
+-- SESIONES EN VIVO
+-- =====================================================
 
 CREATE TABLE live_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -175,23 +252,34 @@ CREATE TABLE live_chat_messages (
     is_deleted BOOLEAN DEFAULT FALSE
 );
 
--- INSERCIÓN DE USUARIO PARA PRUEBAS (SOLO EN VERSIÓN PARA DESARROLLO)
-INSERT INTO users (
-    first_name,
-    last_name,
-    email,
-    birthdate,
-    password_hash,
-    role,
-    timezone,
-    status
-) VALUES (
-    'Admin',
-    'Root',
-    'admin@braindemy.dev',
-    '1990-01-01',
-    'admin123',
-    'admin',
-    'America/El_Salvador',
-    'active'
-);
+-- =====================================================
+-- TRIGGERS DE updated_at
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Generar triggers para todas las tablas con updated_at
+DO $$
+DECLARE t TEXT;
+BEGIN
+    FOR t IN
+        SELECT table_name
+        FROM information_schema.columns
+        WHERE column_name = 'updated_at'
+          AND table_schema = 'public'
+    LOOP
+        EXECUTE format(
+            'CREATE TRIGGER trg_%s_updated_at
+             BEFORE UPDATE ON %I
+             FOR EACH ROW
+             EXECUTE FUNCTION set_updated_at();',
+            t, t
+        );
+    END LOOP;
+END $$;

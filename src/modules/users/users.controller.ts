@@ -1,4 +1,4 @@
-import { Controller, Body, Delete, Get, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
+import { Controller, Body, Delete, Get, Param, Patch, Post, UseGuards, Query, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -6,10 +6,13 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { GetUsersFiltersDto } from './dto/get-user-filter.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import type { Request as ExpressRequest } from 'express';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   // ======= STATS ENDPOINTS ======= //
   @Get('stats/global')
@@ -60,10 +63,24 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  // UPDATE
+  // UPDATE (solo edición personal)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @Request() req: ExpressRequest
+  ) {
+    return this.usersService.updateUser(id, dto, req.user);
+  }
+
+  // UPDATE ADMIN (para cambiar role y status)
+  @Patch(':id/admin')
+  @Roles('admin')
+  updateAdmin(
+    @Param('id') id: string,
+    @Body() dto: AdminUpdateUserDto
+  ) {
+    return this.usersService.updateUserAdmin(id, dto);
   }
 
   // DELETE
