@@ -21,7 +21,6 @@ import type { Request as ExpressRequest } from 'express';
  *
  * @injectable
  */
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
 
@@ -40,6 +39,7 @@ export class UsersController {
    * @returns Un objeto con el número total de usuarios.
    */
   @Get('stats/global')
+  @UseGuards(JwtAuthGuard)
   getGlobalStats() {
     return this.usersService.getGlobalStats();
   }
@@ -50,6 +50,7 @@ export class UsersController {
      * @returns Un objeto o lista con el conteo por rol.
      */
   @Get('stats/roles')
+  @UseGuards(JwtAuthGuard)
   getRoleStats() {
     return this.usersService.getRoleStats();
   }
@@ -60,6 +61,7 @@ export class UsersController {
      * @returns Un objeto o lista con el conteo por estado.
      */
   @Get('stats/status')
+  @UseGuards(JwtAuthGuard)
   getStatusStats() {
     return this.usersService.getStatusStats();
   }
@@ -70,6 +72,7 @@ export class UsersController {
      * @returns El número total de profesores.
      */
   @Get('stats/teachers')
+  @UseGuards(JwtAuthGuard)
   getTeachersCount() {
     return this.usersService.getTeachersCount();
   }
@@ -80,6 +83,7 @@ export class UsersController {
      * @returns El número total de estudiantes.
      */
   @Get('stats/students')
+  @UseGuards(JwtAuthGuard)
   getStudentsCount() {
     return this.usersService.getStudentsCount();
   }
@@ -90,6 +94,7 @@ export class UsersController {
      * @returns Un objeto que contiene todas las métricas de conteo de usuarios.
      */
   @Get('stats')
+  @UseGuards(JwtAuthGuard)
   getAllStats() {
     return this.usersService.getAllStats();
   }
@@ -117,6 +122,7 @@ export class UsersController {
      * @returns Una lista paginada de usuarios que cumplen con los criterios de filtrado.
      */
   @Get()
+  @UseGuards(JwtAuthGuard)
   findAll(@Query() filters: GetUsersFiltersDto) {
     return this.usersService.findAll(filters);
   }
@@ -128,6 +134,7 @@ export class UsersController {
      * @returns El objeto del usuario solicitado.
      */
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
@@ -145,6 +152,7 @@ export class UsersController {
      * @returns El objeto del usuario actualizado.
      */
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -162,6 +170,7 @@ export class UsersController {
      * @returns El objeto del usuario modificado.
      */
   @Patch(':id/admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   updateAdmin(
     @Param('id') id: string,
@@ -180,6 +189,7 @@ export class UsersController {
      * @returns El objeto del usuario eliminado (o un mensaje de éxito).
      */
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
