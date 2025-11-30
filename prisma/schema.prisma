@@ -114,7 +114,7 @@ model teachers {
 // TEACHER APPLICATIONS
 model teachers_applications {
   id            String                     @id @default(uuid()) @db.Uuid
-  user_id       String                     @db.Uuid
+  user_id       String                     @unique @db.Uuid
   bio           String?
   specialty     String?
   experience    String?
@@ -210,11 +210,19 @@ model teacher_subscriptions {
 }
 
 model cards {
-  id         String   @id @default(uuid()) @db.Uuid
-  user_id    String   @db.Uuid
-  balance    Decimal  @default(0) @db.Decimal(10, 2)
-  label      String?
-  is_active  Boolean  @default(true)
+  id      String @id @default(uuid()) @db.Uuid
+  user_id String @db.Uuid
+
+  brand        String
+  last4        String @db.VarChar(4)
+  expire_month Int
+  expire_year  Int
+
+  balance Decimal @default(0) @db.Decimal(10, 2)
+
+  label     String?
+  is_active Boolean @default(true)
+
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 

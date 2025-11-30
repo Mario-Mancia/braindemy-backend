@@ -59,7 +59,7 @@ CREATE TABLE teachers (
 
 CREATE TABLE teachers_applications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     bio TEXT,
     specialty TEXT,
     experience TEXT,
@@ -133,7 +133,11 @@ CREATE TABLE teacher_subscriptions (
 
 CREATE TABLE cards (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    brand TEXT NOT NULL,                 -- Visa / Mastercard / etc.
+    last4 VARCHAR(4) NOT NULL,           -- Solo los últimos 4 dígitos
+    expire_month INT NOT NULL CHECK (expire_month BETWEEN 1 AND 12),
+    expire_year INT NOT NULL,
     balance NUMERIC(10,2) NOT NULL DEFAULT 0,
     label TEXT,
     is_active BOOLEAN DEFAULT TRUE,

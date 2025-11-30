@@ -5,9 +5,6 @@ export class CreateCourseEnrollmentDto {
   @IsUUID()
   course_id: string;
 
-  @IsUUID()
-  student_id: string;
-
   @IsOptional()
   @IsUUID()
   payment_id?: string;

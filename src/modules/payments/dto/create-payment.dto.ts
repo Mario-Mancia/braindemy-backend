@@ -1,12 +1,9 @@
-import { IsUUID, IsOptional, IsNumber, IsString, IsEnum } from 'class-validator';
-import { payment_type, payment_status } from '@prisma/client';
+import { IsUUID, IsOptional, IsNumber, IsString, IsEnum, Min, MaxLength } from 'class-validator';
+import { payment_type } from '@prisma/client';
 
 export class CreatePaymentDto {
-  @IsOptional()
-  @IsUUID()
-  user_id?: string;
-
   @IsNumber()
+  @Min(0.01)
   amount: number;
 
   @IsEnum(payment_type)
@@ -14,5 +11,6 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   reference?: string;
 }

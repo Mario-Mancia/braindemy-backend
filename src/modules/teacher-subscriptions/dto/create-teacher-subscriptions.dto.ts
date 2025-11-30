@@ -3,9 +3,6 @@ import { subscription_status } from '@prisma/client';
 
 export class CreateTeacherSubscriptionsDto {
   @IsUUID()
-  teacher_id: string;
-
-  @IsUUID()
   subscription_id: string;
 
   @IsOptional()

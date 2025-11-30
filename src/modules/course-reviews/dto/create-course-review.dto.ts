@@ -1,11 +1,8 @@
-import { IsUUID, IsInt, Min, Max, IsOptional, IsString } from 'class-validator';
+import { IsUUID, IsInt, Min, Max, IsOptional, IsString, Length } from 'class-validator';
 
 export class CreateCourseReviewDto {
   @IsUUID()
   course_id: string;
-
-  @IsUUID()
-  student_id: string;
 
   @IsInt()
   @Min(1)
@@ -14,5 +11,6 @@ export class CreateCourseReviewDto {
 
   @IsOptional()
   @IsString()
+  @Length(1, 500)
   comment?: string;
 }

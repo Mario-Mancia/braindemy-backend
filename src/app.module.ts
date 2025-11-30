@@ -21,6 +21,10 @@ import { LiveSessionsModule } from './modules/live-sessions/live-sessions.module
 import { CourseEnrollmentModule } from './modules/course-enrollment/course-enrollment.module';
 import { CourseReviewsModule } from './modules/course-reviews/course-reviews.module';
 import { CardModule } from './modules/card/card.module';
+import { TeacherApplicationsModule } from './modules/teacher-applications/teacher-applications.module';
+import { ClassCommentsModule } from './modules/class-comments/class-comments.module';
+import { LessonsModule } from './modules/lessons/lessons.module';
+import { LessonProgressModule } from './modules/lesson-progress/lesson-progress.module';
 import jwtConfig from './config/jwt.config';
 
 @Module({
@@ -37,7 +41,7 @@ import jwtConfig from './config/jwt.config';
     ChatModule, 
     NotificationsModule, 
     AdminModule, 
-    PrismaModule, TeachersModule, StudentsModule, ReviewsModule, SubscriptionsModule, TeacherSubscriptionsModule, LiveSessionsModule, CourseEnrollmentModule, CourseReviewsModule, CardModule
+    PrismaModule, TeachersModule, StudentsModule, ReviewsModule, SubscriptionsModule, TeacherSubscriptionsModule, LiveSessionsModule, CourseEnrollmentModule, CourseReviewsModule, CardModule, TeacherApplicationsModule, ClassCommentsModule, LessonsModule, LessonProgressModule
   ],
   controllers: [AppController],
   providers: [AppService],
