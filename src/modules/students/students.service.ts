@@ -135,7 +135,16 @@ export class StudentsService {
     if (search) {
       where.OR = [
         { bio: { contains: search, mode: 'insensitive' } },
-        { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        {
+          user: {
+            is: {
+              OR: [
+                { first_name: { contains: search, mode: 'insensitive' } },
+                { last_name: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
       ];
     }
 

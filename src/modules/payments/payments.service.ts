@@ -63,8 +63,32 @@ export class PaymentsService {
    * @access Típicamente restringido al rol 'admin' a nivel de controlador.
    * @returns Una lista de todos los pagos, incluyendo la información del usuario asociado.
    */
-  async findAll() {
+  async findAll(query: any) {
+    const { user_id, course_id, status, date } = query;
+
+    const where: any = {};
+
+    // Filters directos
+    if (user_id) where.user_id = user_id;
+    if (course_id) where.course_id = course_id;
+    if (status) where.status = status;
+
+    // Filtro por fecha exacta
+    if (date) {
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+
+      where.created_at = {
+        gte: start,
+        lte: end
+      };
+    }
+
     return this.prisma.payments.findMany({
+      where,
       include: { user: true },
       orderBy: { created_at: 'desc' },
     });

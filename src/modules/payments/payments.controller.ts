@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Delete, Param, Body, BadRequestException, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Param, Body, BadRequestException, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentStatusDto } from './dto/update-payment.dto';
@@ -64,8 +64,8 @@ export class PaymentsController {
      */
     @Get()
     @Roles('admin')
-    findAll() {
-        return this.paymentsService.findAll();
+    findAll(@Query() query: any) {
+        return this.paymentsService.findAll(query);
     }
 
     // -------------------------------------------------------------
