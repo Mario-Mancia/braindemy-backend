@@ -22,8 +22,10 @@ async function bootstrap() {
     origin: true,
     methods: 'GET, PUT, PATCH, POST, DELETE',
     credentials: true
-  })
+  });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT || 3000;
+
+  await app.listen(port, HOST); //
 }
 bootstrap();
