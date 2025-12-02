@@ -90,6 +90,20 @@ export class TeacherApplicationsController {
         return this.service.findAll();
     }
 
+    // GET /teacher-applications/pending
+    @Get('pending')
+    @Roles('admin')
+    async getPending() {
+        const data = await this.service.findPending();
+        return { data };
+    }
+
+    @Get(':id')
+    @Roles('admin')
+    async findOne(@Param('id') id: string) {
+        return this.service.findOne(id);
+    }
+
     // -------------------------------------------------------------
     //  ENDPOINT: PATCH /teacher-applications/me
     // -------------------------------------------------------------

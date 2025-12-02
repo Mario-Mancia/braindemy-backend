@@ -41,7 +41,7 @@ export class TeacherSubscriptionsController {
      * @returns El objeto de la nueva suscripción creada.
      */
     @Post()
-    @Roles('teacher')
+    @Roles('teacher', 'admin')
     create(
         @Req() req: Request & { user: AuthUser },
         @Body() dto: CreateTeacherSubscriptionsDto,

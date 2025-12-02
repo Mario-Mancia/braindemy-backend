@@ -67,9 +67,10 @@ export class TeacherApplicationsService {
       where: { user_id: userId },
     });
 
-    if (!app) throw new NotFoundException('No tienes una solicitud creada');
-
-    return app;
+    return {
+      exists: !!app,
+      application: app ?? null
+    };
   }
 
   // -------------------------------------------------------------------
@@ -88,6 +89,23 @@ export class TeacherApplicationsService {
     });
   }
 
+  async findPending() {
+    return this.prisma.teachers_applications.findMany({
+      where: { status: 'pending' },
+      orderBy: { created_at: 'desc' },
+      include: { user: true },
+    });
+  }
+
+  async findOne(id: string) {
+    const app = await this.prisma.teachers_applications.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!app) throw new NotFoundException('Aplicación no encontrada');
+    return app;
+  }
   // -------------------------------------------------------------------
   // UPDATE MY APPLICATION (Edición del Solicitante)
   // -------------------------------------------------------------------
@@ -149,42 +167,45 @@ export class TeacherApplicationsService {
     dto: AdminReviewTeacherApplicationDto
   ) {
     const app = await this.prisma.teachers_applications.findUnique({
-      where: { id },
-    });
+    where: { id },
+  });
 
-    if (!app) throw new NotFoundException('Solicitud no encontrada');
+  if (!app) throw new NotFoundException('Solicitud no encontrada');
 
-    // Actualizar estado primero
-    const updated = await this.prisma.teachers_applications.update({
-      where: { id },
-      data: {
-        status: dto.status,
-        admin_comment: dto.admin_comment,
-        updated_at: new Date(),
-      },
-    });
+  // ❗ Faltaba esta validación
+  if (app.status !== teacher_application_status.pending) {
+    throw new ForbiddenException(
+      'Esta solicitud ya fue revisada y no puede modificarse'
+    );
+  }
 
-    // Si es rechazada → no crear teacher
-    if (dto.status === teacher_application_status.rejected) return updated;
+  // Actualizar solicitud
+  const updated = await this.prisma.teachers_applications.update({
+    where: { id },
+    data: {
+      status: dto.status,
+      admin_comment: dto.admin_comment,
+      updated_at: new Date(),
+    },
+  });
 
-    // Si es aprobada → crear teacher
-    const teacher = await this.prisma.teachers.create({
-      data: {
-        user_id: app.user_id,
-        bio: app.bio,
-        specialty: app.specialty,
-      },
-    });
+  // Si fue rechazada → simplemente devolver
+  if (dto.status === teacher_application_status.rejected) {
+    return updated;
+  }
 
-    // vincular teachers_applications → teachers
-    await this.prisma.teachers_applications.update({
-      where: { id },
-      data: { teachersId: teacher.id },
-    });
+  // Si fue aprobada → crear registro en `teachers`
+  const teacher = await this.prisma.teachers.create({
+    data: {
+      user_id: app.user_id,
+      bio: app.bio,
+      specialty: app.specialty,
+    },
+  });
 
-    return {
-      application: updated,
-      teacher,
-    };
+  return {
+    application: updated,
+    teacher,
+  };
   }
 }

@@ -7,6 +7,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { TeacherFilterDto } from './dto/teacher-filter.dto';
 import type { Request as ExpressRequest } from 'express';
+import { AuthUser } from 'src/common/types/auth-user.type';
 
 /**
  * @public
@@ -79,6 +80,25 @@ export class TeachersController {
   @Roles('admin', 'teacher')
   findOne(@Param('id') id: string) {
     return this.teachersService.findOne(id);
+  }
+
+  // -------------------------------------------------------------
+  //  ENDPOINT: GET /teachers/check/status
+  // -------------------------------------------------------------
+
+  /**
+   * Verifica el estado del usuario respecto al rol 'teacher':
+   * - Si el usuario NO tiene registro en la tabla teachers → "missing_profile"
+   * - Si el usuario SÍ tiene registro → "has_profile"
+   *
+   * @access Restringido a rol: 'teacher'
+   * @param req La solicitud con el usuario autenticado.
+   * @returns Un objeto con el estado.
+   */
+  @Get('check/status')
+  @Roles('teacher')
+  checkTeacherStatus(@Req() req: ExpressRequest & { user: AuthUser }) {
+    return this.teachersService.checkTeacherStatus(req.user.id);
   }
 
   // -------------------------------------------------------------

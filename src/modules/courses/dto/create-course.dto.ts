@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, Min, IsInt, IsBoolean, IsObject, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, IsInt, IsBoolean, IsObject, ValidateNested, IsArray, IsUUID } from 'class-validator';
 import { CourseScheduleDto } from './course-schedule.dto';
 import { Type } from 'class-transformer';
 import { CourseSettingsDto } from './course-settings.dto';
@@ -25,6 +25,11 @@ import { CourseSettingsDto } from './course-settings.dto';
  * @property is_active (Opcional) Indica si el curso está disponible públicamente desde el momento de su creación.
  */
 export class CreateCourseDto {
+
+  @IsString()
+  @IsUUID() // Opcional, pero recomendado si usas UUIDs
+  teacher_id: string;
+
   @IsString()
   title: string;
 
@@ -42,9 +47,16 @@ export class CreateCourseDto {
   price?: number;
 
   @IsOptional()
+  @IsArray() // <--- AGREGAR ESTO
+  @ValidateNested({ each: true }) // <--- AGREGAR "each: true" para validar cada objeto del array
+  @Type(() => CourseScheduleDto)
+  schedule?: CourseScheduleDto[];
+
+  /*
+  @IsOptional()
   @ValidateNested()
   @Type(() => CourseScheduleDto)
-  schedule?: CourseScheduleDto;
+  schedule?: CourseScheduleDto;*/
 
   @IsOptional()
   @ValidateNested()

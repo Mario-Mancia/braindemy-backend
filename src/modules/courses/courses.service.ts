@@ -33,6 +33,41 @@ export class CoursesService {
      * @returns El objeto del curso creado.
      */
   async create(dto: CreateCourseDto, userId: string) {
+    
+    // 1. Verificamos que el teacher_id que nos mandan exista
+    const teacher = await this.prisma.teachers.findUnique({
+      where: { id: dto.teacher_id }, // Usamos el ID que viene del Frontend
+    });
+
+    if (!teacher)
+      throw new ForbiddenException('El ID del profesor no es válido o no existe');
+
+    // Opcional: Podrías verificar aquí si teacher.user_id === userId para seguridad extra
+    // pero si quieres regresar a como estaba antes, con esto basta.
+
+    return this.prisma.courses.create({
+      data: {
+        teacher_id: dto.teacher_id, // <--- USAMOS EL DEL DTO
+        title: dto.title,
+        description: dto.description ?? null,
+        category: dto.category ?? null,
+        price: dto.price ?? 0,
+        color: dto.color ?? null,
+        cover_url: dto.cover_url ?? null,
+        level: dto.level ?? null,
+        duration: dto.duration ?? null,
+        max_students: dto.max_students ?? 50,
+        is_active: dto.is_active ?? true,
+
+        // Mantenemos el parche del 'as any' para evitar el error de tipos de Prisma
+        schedule: dto.schedule ? (dto.schedule as any) : undefined,
+        settings: dto.settings ? (dto.settings as any) : undefined,
+      },
+    });
+  }
+
+  /*
+  async create(dto: CreateCourseDto, userId: string) {
     // Solo profesores pueden crear cursos
     const teacher = await this.prisma.teachers.findUnique({
       where: { id: userId },
@@ -56,11 +91,11 @@ export class CoursesService {
         is_active: dto.is_active ?? true,
 
         // JSON fields
-        schedule: dto.schedule ? { ...dto.schedule } : undefined,
+        schedule: dto.schedule ? (dto.schedule as any) : undefined,
         settings: dto.settings ? { ...dto.settings } : undefined,
       },
     });
-  }
+  }*/
 
   // -------------------------------------------------------------
   // FIND ALL (Filtros + paginación)
@@ -202,7 +237,7 @@ export class CoursesService {
         is_active: dto.is_active ?? undefined,
 
         // JSON fields si vienen definidos
-        schedule: dto.schedule ? { ...dto.schedule } : undefined,
+        schedule: dto.schedule ? (dto.schedule as any) : undefined,
         settings: dto.settings ? { ...dto.settings } : undefined,
 
         updated_at: new Date(),

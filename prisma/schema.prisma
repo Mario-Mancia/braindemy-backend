@@ -106,7 +106,6 @@ model teachers {
   updated_at           DateTime @default(now())
 
   user          users                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  applications  teachers_applications[]
   subscriptions teacher_subscriptions[]
   courses       courses[]
 }
@@ -125,8 +124,6 @@ model teachers_applications {
   updated_at    DateTime                   @default(now())
 
   user       users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  teachers   teachers? @relation(fields: [teachersId], references: [id])
-  teachersId String?   @db.Uuid
 }
 
 // STUDENTS

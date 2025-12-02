@@ -21,21 +21,21 @@ export class TeachersService {
   /**
      * @param prisma Instancia de PrismaService para interactuar con la base de datos.
      */
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   // -------------------------------------------------------------
-    // CREATE (Creación de Perfil de Profesor)
-    // -------------------------------------------------------------
-    /**
-     * Crea un nuevo perfil de profesor asociado a un usuario existente.
-     *
-     * Este método se utiliza típicamente internamente o por un administrador después de un proceso de aprobación.
-     *
-     * @param data Los datos del perfil del profesor a crear (CreateTeacherDto), incluyendo el `user_id`.
-     * @throws NotFoundException Si el usuario asociado (`user_id`) no existe.
-     * @throws ConflictException Si el usuario ya tiene un perfil de profesor.
-     * @returns El objeto del perfil de profesor creado con un conjunto selecto de campos.
-     */
+  // CREATE (Creación de Perfil de Profesor)
+  // -------------------------------------------------------------
+  /**
+   * Crea un nuevo perfil de profesor asociado a un usuario existente.
+   *
+   * Este método se utiliza típicamente internamente o por un administrador después de un proceso de aprobación.
+   *
+   * @param data Los datos del perfil del profesor a crear (CreateTeacherDto), incluyendo el `user_id`.
+   * @throws NotFoundException Si el usuario asociado (`user_id`) no existe.
+   * @throws ConflictException Si el usuario ya tiene un perfil de profesor.
+   * @returns El objeto del perfil de profesor creado con un conjunto selecto de campos.
+   */
   async create(data: CreateTeacherDto) {
     const user = await this.prisma.users.findUnique({
       where: { id: data.user_id },
@@ -67,16 +67,16 @@ export class TeachersService {
   }
 
   // -------------------------------------------------------------
-    // FIND ALL (Listado y Filtros)
-    // -------------------------------------------------------------
-    /**
-     * Obtiene una lista paginada de perfiles de profesores, con opciones avanzadas de filtrado.
-     *
-     * Permite filtrar por: `specialty`, rango de `min_rating`/`max_rating`, y `search` (en nombre o biografía).
-     *
-     * @param filters El DTO con los parámetros de filtrado y paginación (TeacherFilterDto).
-     * @returns Un objeto con metadatos de paginación y la lista de profesores (`data`), incluyendo sus cursos y suscripciones.
-     */
+  // FIND ALL (Listado y Filtros)
+  // -------------------------------------------------------------
+  /**
+   * Obtiene una lista paginada de perfiles de profesores, con opciones avanzadas de filtrado.
+   *
+   * Permite filtrar por: `specialty`, rango de `min_rating`/`max_rating`, y `search` (en nombre o biografía).
+   *
+   * @param filters El DTO con los parámetros de filtrado y paginación (TeacherFilterDto).
+   * @returns Un objeto con metadatos de paginación y la lista de profesores (`data`), incluyendo sus cursos y suscripciones.
+   */
   async findAll(filters: TeacherFilterDto) {
     const { search, specialty, min_rating, max_rating, page, limit } = filters;
 
@@ -131,15 +131,15 @@ export class TeachersService {
   }
 
   // -------------------------------------------------------------
-    // FIND ONE (Detalle)
-    // -------------------------------------------------------------
-    /**
-     * Obtiene los detalles completos de un perfil de profesor específico por su ID interno.
-     *
-     * @param id El ID único del perfil de profesor.
-     * @throws NotFoundException Si el profesor no es encontrado.
-     * @returns El objeto del profesor solicitado, incluyendo usuario, cursos y suscripciones.
-     */
+  // FIND ONE (Detalle)
+  // -------------------------------------------------------------
+  /**
+   * Obtiene los detalles completos de un perfil de profesor específico por su ID interno.
+   *
+   * @param id El ID único del perfil de profesor.
+   * @throws NotFoundException Si el profesor no es encontrado.
+   * @returns El objeto del profesor solicitado, incluyendo usuario, cursos y suscripciones.
+   */
   async findOne(id: string) {
     const teacher = await this.prisma.teachers.findUnique({
       where: { id },
@@ -155,22 +155,44 @@ export class TeachersService {
   }
 
   // -------------------------------------------------------------
-    // UPDATE (Edición)
-    // -------------------------------------------------------------
-    /**
-     * Actualiza la información de un perfil de profesor.
-     *
-     * Reglas de Seguridad: Solo el **administrador** o el **profesor dueño** del perfil pueden editarlo.
-     * Regla de Negocio: Valida que el `rating` (si se actualiza) esté en el rango de 0 a 5.
-     *
-     * @param id El ID interno del perfil de profesor a actualizar.
-     * @param data Los datos parciales para la actualización (UpdateTeacherDto).
-     * @param requester El objeto del usuario autenticado que intenta realizar la actualización.
-     * @throws NotFoundException Si el profesor no existe.
-     * @throws ForbiddenException Si el usuario no tiene permisos para editar el perfil.
-     * @throws BadRequestException Si el rating proporcionado es inválido.
-     * @returns El objeto del perfil de profesor actualizado.
-     */
+  // CHECK STATUS (verifica si el user tiene perfil teacher)
+  // -------------------------------------------------------------
+
+  /**
+   * Verifica si el usuario ya tiene un perfil en la tabla `teachers`.
+   *
+   * @param userId El ID del usuario autenticado.
+   * @returns { status: 'missing_profile' | 'has_profile' }
+   */
+  async checkTeacherStatus(userId: string) {
+    const teacher = await this.prisma.teachers.findUnique({
+      where: { user_id: userId },
+      select: { id: true },
+    });
+
+    if (!teacher) return { status: 'missing_profile' };
+
+    return { status: 'has_profile', teacherId: teacher.id }; // ← añadir teacherId
+  }
+
+
+  // -------------------------------------------------------------
+  // UPDATE (Edición)
+  // -------------------------------------------------------------
+  /**
+   * Actualiza la información de un perfil de profesor.
+   *
+   * Reglas de Seguridad: Solo el **administrador** o el **profesor dueño** del perfil pueden editarlo.
+   * Regla de Negocio: Valida que el `rating` (si se actualiza) esté en el rango de 0 a 5.
+   *
+   * @param id El ID interno del perfil de profesor a actualizar.
+   * @param data Los datos parciales para la actualización (UpdateTeacherDto).
+   * @param requester El objeto del usuario autenticado que intenta realizar la actualización.
+   * @throws NotFoundException Si el profesor no existe.
+   * @throws ForbiddenException Si el usuario no tiene permisos para editar el perfil.
+   * @throws BadRequestException Si el rating proporcionado es inválido.
+   * @returns El objeto del perfil de profesor actualizado.
+   */
   async update(id: string, data: UpdateTeacherDto, requester: any) {
     const teacher = await this.prisma.teachers.findUnique({
       where: { id },
@@ -195,16 +217,16 @@ export class TeachersService {
   }
 
   // -------------------------------------------------------------
-    // DELETE (Eliminación)
-    // -------------------------------------------------------------
-    /**
-     * Elimina un perfil de profesor del sistema.
-     *
-     * @access Típicamente restringido al rol 'admin' a nivel de controlador.
-     * @param id El ID interno del perfil de profesor a eliminar.
-     * @throws NotFoundException Si el profesor no existe.
-     * @returns El objeto del perfil de profesor eliminado.
-     */
+  // DELETE (Eliminación)
+  // -------------------------------------------------------------
+  /**
+   * Elimina un perfil de profesor del sistema.
+   *
+   * @access Típicamente restringido al rol 'admin' a nivel de controlador.
+   * @param id El ID interno del perfil de profesor a eliminar.
+   * @throws NotFoundException Si el profesor no existe.
+   * @returns El objeto del perfil de profesor eliminado.
+   */
   async delete(id: string) {
     const exists = await this.prisma.teachers.findUnique({
       where: { id },
